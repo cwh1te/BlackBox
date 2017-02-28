@@ -169,12 +169,31 @@ Meta adapters are the complicated part of BlackBox that make writing
 adapters so simple. They create and maintain databases with tables for
 each adapter and definition.
 
-TODO: Expand this portion of the readme extensively
+The included meta adapter for sqlite3 is fairly simple and should be a
+good reference for anyone looking to write their own adapter for another
+backend.
+
+The most important thing is that meta adapters always give and receive
+data to and from the adapters in the same way, and store it in a similar
+structure.
+
+Meta adapters, since they're responsible for passing data to adapters,
+will determine how much historical data to provide. The included adapter
+pulls all data from the past three days, but this can easily be
+customized.
 
 
 ## <a name="template"></a>Adapter Template
 
-TODO: Explain what the adapter template is for
+The adapter template provides a boilerplate for all other adapters. It handles
+populating certain class properties as well as providing useful functions for
+your project. The included template has functions to hash files and extract
+IPs and domain names using regex. Your version should have whatever methods
+you're likely to need across multiple adapters.
+
+The `__init__` method generally should not be altered; each module will call
+this method in its own `__init__` method, so it's best to put customizations
+in the individual modules.
 
 
 ## <a name="license"></a>License
