@@ -1,0 +1,55 @@
+
+### Example Adapter ###
+
+###   ADAPTER SETTINGS   ###
+# See Definitions directory for available output types
+# input_type is not required, but output_type is
+input_type =		""
+output_type =		""
+
+# Stored properties provide state information to your adapter
+# Valid formats are string, int, and bool
+# A timestamp should be added by the metamodule
+stored_properties = {
+	"example1" : "",
+	"example2" : 0,
+	"example3" : False
+}
+# What value from stored_properties should the meta module key on?
+key = "example1"
+
+# Miscellaneous settings specific to this adapter
+#		...
+#			...
+### END ADAPTER SETTINGS ###
+
+from Template import AdapterTemplate
+
+class BlankAdapter(AdapterTemplate): # Class name must match filename
+
+	# Set up class instance with default values
+	def __init__(self, *args):
+		super(BlankAdapter, self).__init__(input_type, output_type, "", stored_properties, key, *args)
+		# Change "BlankAdapter" to the class name
+		
+		# Add any necessary init code here
+		
+	
+	def main(self, input):
+	
+		# input will be an list of instances of input_type
+		
+		# Add main function
+		
+		###   OUTPUT OBJECT   ###
+		# The output object should contain:
+		#	data (instances of the output_type)
+		#	state (instances of self.stored_properties)
+		
+		output = {
+			"data"  : [],
+			"state" : []
+		}
+		### END OUTPUT OBJECT ###
+		
+		return output
