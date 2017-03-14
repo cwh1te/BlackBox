@@ -2,7 +2,7 @@
 
 # I use tabs, not spaces. Sorry not sorry.
 
-import os, sys, argparse, textwrap, settings, importlib
+import os, sys, argparse, textwrap, settings, importlib, Adapters
 
 # Handle commandline arguments
 parser = argparse.ArgumentParser(
@@ -98,22 +98,32 @@ for adapter_name in adapter_list:
 		if os.path.isdir(adapter_name[0]) or adapter_name[1] != "py" or adapter_name[0] == "Template":
 			continue
 		# Import the adapter
-		adapter = importlib.import_module(adapter_name[0], "Adapters.{0}".format(adapter_name[0]))
+		try:
+			adapter = importlib.import_module(adapter_name[0], "Adapters.{0}".format(adapter_name[0]))
+		except: # Still not sure why this is necessary
+			adapter = importlib.import_module(adapter_name[0], "Adapters")
 		# Import and initialize the adapter's class
 		adapter = getattr(adapter, adapter_name[0])
-		adapter = adapter(verbose, debug, log)
-		adapter.log("Module loaded!", "success")
-		# Drop it in the proper array
-		if adapter.type == "Meta":
-			meta_adapters.append(adapter)
-		else:
-			adapters.append(adapter)
+		try:
+			adapter = adapter(verbose, debug, log)
+			adapter.log("Module loaded!", "success")
+			# Drop it in the proper array
+			if adapter.type == "Meta":
+				meta_adapters.append(adapter)
+			else:
+				adapters.append(adapter)
+		except:
+			raise # This doesn't throw an error, it just raises it to the next except block
 	except:
+		print("\033[93m\033[1mERROR: Failed to load adapter: {0}\033[0m".format(".".join(adapter_name))) # ANSI escape codes for bold yellow text
 		if debug:
 			raise
 		continue
-
+		
 ### Adapter Execution ###
+
+if meta_adapters == []:
+	print("\033[91m\033[1mWARNING: No meta adapter found! Adapters will receive no input and no output will be stored!\033[0m") # ANSI escape codes for bold red text
 
 # Iterate through available adapters
 for adapter in adapters:
