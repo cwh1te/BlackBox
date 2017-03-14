@@ -41,15 +41,19 @@ class AdapterTemplate(object):
 		self.log_format = global_settings.log_format
 		self.date_format = global_settings.date_format
 		self.datetime_format = global_settings.datetime_format
+		self.force_print = global_settings.force_print
 	
 	# Log events to shell and/or log file
 	def log(self, message, type = "info", force = False):
-		# [adapter_type:adapter_name] message
+		if type in self.force_print:
+			force = True
+	
+		# [adapter_name] message
 		message = "{0}[{1}] {2} - {3} {4}".format(
 			self.log_format[type],
 			self.name,
 			message,
-			time.strftime(global_settings.datetime_format),
+			time.strftime(self.datetime_format),
 			self.log_format["end"]
 		)
 		
@@ -58,10 +62,11 @@ class AdapterTemplate(object):
 			print(message)
 		
 		# Log to file if appropriate
+		if not os.path.isdir(os.path.join(os.getcwd(), "logs")):
+			os.makedirs("logs")
 		if self.keep_log:
-			temp = open("logs/{0}.log".format(self.type), "a")
-			print(message, file=temp)
-			temp.close()
+			with open("logs/{0}.log".format(self.name), "a") as temp:
+				temp.write("{0}\n".format(message))
 
 	# Return SHA256 hash of file
 	def sha256(self, filename):
@@ -107,3 +112,100 @@ class AdapterTemplate(object):
 					raise
 		else:
 			self.log("Directory {0} is ready.".format(dir))
+			
+	def extract_file(self, file, loop=True):
+		import zipfile, gzip, tarfile, shutil
+
+		out_files = []
+		file = str(file)
+		f_base, f_ext = os.path.splitext(file)
+
+		# ZIP archives
+		if f_ext == ".zip":
+			self.log("Expanding ZIP archive {0}.".format(file))
+			try:
+				with zipfile.ZipFile(os.path.join(self.directory, file)) as zip:
+					# testzip() returns None or name of first bad file
+					if zipfile.ZipFile.testzip(zip) is not None:
+						self.log("Malformed ZIP or contents corrupted! Unable to process.", "fail")
+						return False
+					# Not using extractall() because we don't want a tree structure
+					for member in zip.infolist():
+						member = self.unique_fname(member)
+						zip.extract(member, self.directory)
+						out_files.append(str(member))
+					# Delete the zip now that we have its contents
+					os.remove(os.path.join(self.directory, file))
+			except:
+				self.log("Unable to expand ZIP archive {0}. You should check its headers or something.".format(file), "fail")
+				if self.debug:
+					raise
+				return False
+
+		# GZIP compression
+		elif f_ext == ".gz":
+			self.log("Expanding GZIP compressed file {0}.".format(file))
+			try:
+				out_fname = self.unique_fname(f_base)
+				with gzip.open(os.path.join(self.directory, file), "rb") as f_in, open(os.path.join(self.directory, out_fname), "wb") as f_out:
+					shutil.copyfileobj(f_in, f_out)
+				out_files.append(out_fname)
+				# Delete the gz now that we have its contents
+				os.remove(os.path.join(self.directory, file))
+			except:
+				self.log("Unable to expand GZIP file {0}. It's likely malformed.".format(file), "fail")
+				if self.debug:
+					raise
+				return False
+
+		# TAR archives
+		elif f_ext == ".tar":
+			self.log("Expanding TAR archive {0}.".format(file))
+			try:
+				with tarfile.open(os.path.join(self.directory, file), "r") as tar:
+					for member in tar.getmembers():
+						if member.isreg():
+							# Strip any path information from members
+							member.name = self.unique_fname(os.path.basename(member.name))
+							tar.extract(member, self.directory)
+							out_files.append(member.name)
+					# Delete the tar now that we have its contents
+					os.remove(os.path.join(self.directory, file))
+			except:
+				self.log("Unable to expand TAR archive {0}. Something is wrong with it.".format(file), "fail")
+				if self.debug:
+					raise
+				return False
+		
+		# The file is not compressed or archived, or not a supported format
+		else:
+			out_files.append(file)
+		
+		if not loop:
+			return out_files
+		
+		# Iterate back through, in case of layered archives or compressed archives (e.g. example.tar.gz)
+		final_out_files = []
+		for file in out_files:
+			# Set loop switch to False to avoid creating blackhole
+			final_out_files.append(self.extract_file(file, False))
+		
+		return final_out_files
+
+	def unique_fname(self, file):
+		# Rename file if necessary to avoid overwrite...
+		basename, ext = self.get_fext(str(file))
+		i = 0
+		while os.path.exists(os.path.join(self.directory, "{0} ({1}){2}".format(basename, i, ext)) if i else "{0}/{1}".format(self.directory, file)):
+			i += 1
+		# Apply the filename determined by the previous step
+		if i:
+			file = "{0} ({1}){2}".format(basename, i, ext)
+		return file
+		
+	def get_fext(self, file):
+		basename, ext = os.path.splitext(file)
+		while "." in basename[-6:]:
+			basename, ext2 = os.path.splitext(basename)
+			ext = ext2 + ext
+		return basename, ext
