@@ -1,9 +1,8 @@
-
 ### SQLite3 Meta Adapter ###
 
 ###   ADAPTER SETTINGS   ###
 adapter_type =		"Meta"
-database =			"sqlite.db"
+database =			""
 ### END ADAPTER SETTINGS ###
 
 import sqlite3, time
@@ -14,7 +13,7 @@ class sqlite(AdapterTemplate): # Class name must match filename
 
 	# Set up class instance with default values
 	def __init__(self, *args):
-		super(sqlite, self).__init__("", "", adapter_type, *args)
+		super(sqlite, self).__init__("", "", adapter_type, "", "", *args)
 		self.conn = sqlite3.connect(database, timeout=10)
 		self.c = self.conn.cursor()
 
@@ -143,27 +142,32 @@ class sqlite(AdapterTemplate): # Class name must match filename
 		now = time.strftime(self.date_format)
 		# Try to update an existing entry
 		for object in objectlist:
+			args = []
 			sql = "UPDATE {0} SET ".format(objname)
 			for var in object:
 				if var == "stored_properties":
 					continue
-				sql = "{0}{1}='{2}', ".format(sql, var, object[var])
+				sql = "{0}{1}=?, ".format(sql, var)
+				args.append(object[var])
 			sql = sql[:-2] if is_adapter else "{0} last_seen='{1}'".format(sql, now)
-			sql = "{0}WHERE {1}='{2}';".format(sql, key, object[key])
-			self.c.execute(sql)
+			sql = "{0}WHERE {1}=?;".format(sql, key)
+			args.append(object[key])
+			self.c.execute(sql, (args))
 			if not self.c.rowcount:
+				args = []
 				sql = "INSERT INTO {0} (".format(objname)
 				sql2 = ") VALUES ("
-				# Since lists are unordered, both halves of the insert query must be built simultaneously
+				# Since inputs are unordered, both halves of the insert query must be built simultaneously
 				for var in object:
 					sql = "{0}{1}, ".format(sql, var)
-					sql2 = "{0}'{1}', ".format(sql2, object[var])
+					sql2 = "{0}?, ".format(sql2)
+					args.append(object[var])
 				sql = "{0}date{1}'{2}');".format(sql, sql2, now) if is_adapter else "{0}first_seen, last_seen{1}'{2}', '{2}');".format(sql, sql2, now)
-				self.c.execute(sql)
+				self.c.execute(sql, (args))
 				result = self.c.fetchall()
 				if not self.c.rowcount:
 					self.log("SQL insert failed: {0}".format(sql), "fail")
 					continue
-			#self.log("Executed query: {0}".format(sql), "success")
+			self.log("Executed query: {0}".format(sql), "success")
 			self.conn.commit()
 		return True
